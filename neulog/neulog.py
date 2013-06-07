@@ -293,7 +293,7 @@ def scan():
         for i in range(256):
             try:
                 s = serial.Serial(i)
-                available.append( (i, s.portstr))
+                available.append( s.portstr)
                 s.close()
             except serial.SerialException:
                 pass
@@ -304,8 +304,8 @@ def detect_device():
     for port in ports:
         d = Device(port = port)
         try:
-            d = float(d.getSensorsData(16,1))
-            if isinstance(d, float):
+            #d = float(d.getSensorsData(16,1))
+            if d.connect():
                 return port
         except:
             pass
@@ -315,8 +315,10 @@ class gsr(object):
 
     def __init__(self):
         self.device = Device()
+        t = time.time()
         while not self.device.connect(): 
-            pass        
+            if time.time() - t > 2:
+                break
 
     def get_data(self):
         return float(self.device.getSensorsData(16,1))
