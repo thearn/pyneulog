@@ -1,4 +1,5 @@
 import serial
+import platform
 import time
 import os
 
@@ -45,8 +46,9 @@ def bcd(l):
     return num.strip()
 
 class Device(serial.Serial):
-    def __init__(self):
-        port = "/dev/tty.SLAB_USBtoUART"
+    def __init__(self, port = None):
+        if not port:
+            port = self.get_port()
         serial.Serial.__init__(
             self,
             port = port,
@@ -58,6 +60,16 @@ class Device(serial.Serial):
         )
         self.status = 'connected'
         self.buf = []
+
+    def get_port(self):
+        return detect_device()
+        """
+        osname = platform.system()
+        if osname == "Darwin":
+            port = "/dev/tty.SLAB_USBtoUART"
+        else:
+            port = "COM5"
+        """
 
     def send(self, s, checksum = False):
         time.sleep(0.02)
@@ -270,12 +282,41 @@ class Device(serial.Serial):
 
         return [samples, updates]
 
+def scan():
+    # scan for available ports. return a list of tuples (num, name)
+    if platform.system() == "Darwin":
+        import glob
+        return glob.glob('/dev/tty.S*')
+    else:
+
+        available = []
+        for i in range(256):
+            try:
+                s = serial.Serial(i)
+                available.append( (i, s.portstr))
+                s.close()
+            except serial.SerialException:
+                pass
+        return available
+
+def detect_device():
+    ports = scan()
+    for port in ports:
+        d = Device(port = port)
+        try:
+            d = float(d.getSensorsData(16,1))
+            if isinstance(d, float):
+                return port
+        except:
+            pass
+
 
 class gsr(object):
 
     def __init__(self):
         self.device = Device()
-        while(not self.device.connect): pass        
+        while not self.device.connect(): 
+            pass        
 
     def get_data(self):
         return float(self.device.getSensorsData(16,1))
