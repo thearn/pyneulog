@@ -263,12 +263,6 @@ class Device(serial.Serial):
                 dat = [bcd([ord(c) for c in self.buf[i:i+3]]) for i in range(6, 16, 3)]
                 samples.append([stype, sid, dat])
 
-                # Is this really needed?
-                if self.status[8:] == 'Offline' and '-' in dat:
-                    print 'IT HAPPENED - tell Israel'
-                    self.status = 'connected'
-                    samples.append('done')
-
                 self.buf = self.buf[19:]
             elif self.buf[0] == STX and self.buf[3] == READ_RAM:
                 stype = ord(self.buf[1])
