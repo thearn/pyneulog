@@ -263,12 +263,6 @@ class Device(serial.Serial):
                 dat = [bcd([ord(c) for c in self.buf[i:i+3]]) for i in range(6, 16, 3)]
                 samples.append([stype, sid, dat])
 
-                # Is this really needed?
-                if self.status[8:] == 'Offline' and '-' in dat:
-                    print 'IT HAPPENED - tell Israel'
-                    self.status = 'connected'
-                    samples.append('done')
-
                 self.buf = self.buf[19:]
             elif self.buf[0] == STX and self.buf[3] == READ_RAM:
                 stype = ord(self.buf[1])
@@ -293,7 +287,7 @@ def scan():
         for i in range(256):
             try:
                 s = serial.Serial(i)
-                available.append( (i, s.portstr))
+                available.append( s.portstr)
                 s.close()
             except serial.SerialException:
                 pass
@@ -304,8 +298,8 @@ def detect_device():
     for port in ports:
         d = Device(port = port)
         try:
-            d = float(d.getSensorsData(16,1))
-            if isinstance(d, float):
+            #d = float(d.getSensorsData(16,1))
+            if d.connect():
                 return port
         except:
             pass
@@ -317,8 +311,10 @@ class gsr(object):
         self.unit = unit
         self.factor = (2**16)/10. 
         self.device = Device()
+        t = time.time()
         while not self.device.connect(): 
-            pass        
+            if time.time() - t > 2:
+                break
 
     def get_data(self):
         x = float(self.device.getSensorsData(16,1))
