@@ -6,7 +6,7 @@ Loads & plots data from disk
 """
 
 data, times, breaktime = load("experiment.dat")
-
+print data
 pylab.figure()
 pylab.plot(times, data)
 

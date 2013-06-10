@@ -318,7 +318,7 @@ class gsr(object):
 
     def get_data(self):
         x = float(self.device.getSensorsData(16,1))
-        if unit:
+        if self.unit:
             return x*self.factor
         else:
             return x

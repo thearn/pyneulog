@@ -19,9 +19,9 @@ t0 = time.time()
 print "First phase..."
 while True: #first phase (eg. 'resting')
     try:
-        x = gsr.get_data()
+        x = sensor.get_data()
         t = time.time() - t0
-        
+        print t, x
         data.append(x)
         times.append(t)
     
@@ -34,9 +34,9 @@ print "Second phase..."
 while True: #second phase (eg. 'attentive')
     
     try:
-        x = gsr.get_data()
-        time.time() - t0
-        
+        x = sensor.get_data()
+        t = time.time() - t0
+        print t, x
         data.append(x)
         times.append(t)
     
