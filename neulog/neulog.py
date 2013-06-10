@@ -313,13 +313,19 @@ def detect_device():
 
 class gsr(object):
 
-    def __init__(self):
+    def __init__(self, unit = False):
+        self.unit = unit
+        self.factor = (2**16)/10. 
         self.device = Device()
         while not self.device.connect(): 
             pass        
 
     def get_data(self):
-        return float(self.device.getSensorsData(16,1))
+        x = float(self.device.getSensorsData(16,1))
+        if unit:
+            return x*self.factor
+        else:
+            return x
 
 if __name__ == '__main__':
     d = gsr()
