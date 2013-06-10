@@ -2,13 +2,22 @@ from neulog import gsr
 from gzp import save
 import time
 
+"""
+Sample GSR experiment.
+
+Gathers data over two phases. Use a keyboard interrupt (control-c) to end a phase.
+
+Saves data to disk afterwards.
+"""
+
 sensor = gsr()
 
 data = []
 times = []
 t0 = time.time()
 
-while True: #resting 
+print "First phase..."
+while True: #first phase (eg. 'resting')
     try:
         x = gsr.get_data()
         t = time.time() - t0
@@ -21,7 +30,8 @@ while True: #resting
 
 breaktime = time.time() - t0
 
-while True: #active
+print "Second phase..."
+while True: #second phase (eg. 'attentive')
     
     try:
         x = gsr.get_data()
@@ -33,4 +43,5 @@ while True: #active
     except KeyboardInterrupt:
         break
 
+print "Done - saving to disk ('experiment.dat')"
 save([data, times, breaktime], "experiment.dat")

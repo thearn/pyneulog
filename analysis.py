@@ -1,6 +1,10 @@
 from gzp import load
 import pylab
 
+"""
+Loads & plots data from disk
+"""
+
 data, times, breaktime = load("experiment.dat")
 
 pylab.figure()
