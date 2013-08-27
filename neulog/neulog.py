@@ -52,11 +52,7 @@ class Device(serial.Serial):
         serial.Serial.__init__(
             self,
             port = port,
-            baudrate = 115200,
-            parity = serial.PARITY_NONE,
-            stopbits = serial.STOPBITS_TWO,
-            bytesize = serial.EIGHTBITS,
-            timeout = 1
+            baudrate = 115200
         )
         self.status = 'connected'
         self.buf = []
@@ -72,7 +68,7 @@ class Device(serial.Serial):
         """
 
     def send(self, s, checksum = False):
-        time.sleep(0.02)
+        #time.sleep(0.001)
         self.flushInput()
         self.flushOutput()
         for c in s:
@@ -80,8 +76,8 @@ class Device(serial.Serial):
         if checksum:
             self.write(chr(sum([ord(c) for c in s]) % 256))
 
-    def receive(self, i = False):
-        time.sleep(0.02)
+    def receive(self, i = False, sleep = 0.02):
+        time.sleep(sleep)
         iw = self.inWaiting()
         if False == i: i = iw
         if iw >= i:
@@ -102,16 +98,21 @@ class Device(serial.Serial):
         if self.status != 'connected': return False
         self.send(STX_USB + USB_LEARN + MAX_TYPE + MAX_ID, True)
         r = self.receive(4)
-        print "What's this: %i" % (ord(r[-1]))
+        #print "What's this: %i" % (ord(r[-1]))
         if STX_USB + USB_LEARN + ACK == r[:-1]:
             self.status = 'scanning'
             return True
         return False
 
-    def scanRead(self):
+    def scanRead(self, timeout = 1):
         if self.status != 'scanning': return False
         sensors = []
-        r = self.receive()
+        r = ""
+        t0 = time.time()
+        while not r:
+            r = self.receive().strip()
+            if time.time() - t0 > timeout:
+                return sensors
         while len(r) > 7:
             chunk, r = r[:8], r[8:]
             if STX != chunk[0]: continue
@@ -142,8 +143,8 @@ class Device(serial.Serial):
     def eewrite(self, stype, sid, add, val):
         if self.status[:7] == 'running': return False
         self.send(STX + stype + sid + WRITE_TO_EE + chr(0) + add + val, True)
-        if self.receive()[0:5] != STX + stype + sid + WRITE_TO_EE + ACK:
-            raise Exception('Sensor did not acknowledge');
+        #if self.receive()[0:5] != STX + stype + sid + WRITE_TO_EE + ACK:
+        #    raise Exception('Sensor did not acknowledge');
 
     def getSensorRange(self, stype, sid):
         if self.status != 'connected': return False
@@ -157,7 +158,7 @@ class Device(serial.Serial):
     def getSensorsData(self, stype, sid):
         if self.status != 'connected': return False
         self.send(STX + chr(stype) + chr(sid) + IN_READ + (3 * chr(0)), True)
-        r = self.receive()
+        r = self.receive(sleep=0.001)
         if not r or STX != r[0] or IN_READ != r[3]: return False
         r = [ord(c) for c in r]
         if r[-1] != sum(r[:-1]) % 256: return False
@@ -190,15 +191,14 @@ class Device(serial.Serial):
         # Sensors, like many other things in NeuLog, are enumerated from 1
         i = 1
         for s in sensors:
-            stype = chr(s[0]);
-            sid = chr(s[1]);
+            stype = chr(s[0])
+            sid = chr(s[1])
 
             # Sensor list
             self.send(STX_USB + SEN_LIST + chr(i) + stype + sid + chr(1), True)
-            if self.receive()[0:4] != STX_USB + SEN_LIST + chr(i) + ACK:
+            if self.receive()[0:3] != STX_USB + SEN_LIST + chr(i):
                 raise Exception('Sensor did not acknowledge');
             i += 1
-
             # Mark sensor as participant
             self.eewrite(stype, sid, chr(14), chr(1))
 
@@ -206,7 +206,7 @@ class Device(serial.Serial):
             if online:
                 self.eewrite(stype, sid, chr(2), chr(rate / 256))
                 self.eewrite(stype, sid, chr(3), chr(rate % 256))
-                self.eewrite(stype, sid, chr(4), chr(timebase))
+                self.eewrite(stype, sid, chr(4), chr(1))
                 self.eewrite(stype, sid, chr(5), chr(0))
                 self.eewrite(stype, sid, chr(6), chr(0))
                 self.eewrite(stype, sid, chr(7), chr(0))
@@ -294,8 +294,6 @@ def scan():
 
 def detect_device():
     ports = scan()
-    print ports
-    quit()
     for port in ports:
         d = Device(port = port)
         try:
@@ -308,41 +306,61 @@ def detect_device():
 
 class Neulog(object):
 
-    def __init__(self, unit = False):
+    def __init__(self, unit = False, port = ""):
         self.unit = unit
         #GSR: microsiemens
         #HR: 
         #EKG:
-        self.factors = {"GSR" : (2**16)/10.,
-                        "HR" : (2**10)/210 + 30} 
-        self.device = Device()
+        self.sensor_names = {16: "GSR module", 
+                             8: "Pulse module",
+                             25: "ECG module"}
+        self.factors = {16 : [10./(2**16),0.],
+                        8 : [210./1024., 30.]} 
+        self.device = Device(port = port)
         t = time.time()
         while not self.device.connect(): 
             if time.time() - t > 2:
                 break
             
     def scan(self):
-        self.sensors = self.device.scanRead()
-        
-        #self.eewrite(stype, sid, chr(2), chr(rate / 256))
-        #self.eewrite(stype, sid, chr(3), chr(rate % 256))
+        print
+        print "scanning for Neulog sensors..."
+        print 30*"="
+        t = time.time()
+        sensors = []
+        self.device.scanStart()
+        sensor = self.device.scanRead()
+        while len(sensor) !=0:
+            sensors += sensor
+            sensor = self.device.scanRead()
+        self.device.scanStop()
+        for sensor in sensors:
+            if sensor[0] in self.sensor_names:
+                print "found:", self.sensor_names[sensor[0]]
+            else:
+                print "found: (unknown module)", sensor
+        self.sensors = sensors
         
     def get_data2(self):
         times, data = [], []
         for stype, sid, vid in self.sensors:
             x = self.device.getSensorsData(stype,sid)
+            #factor, shift = self.factors[stype]
             times.append(time.time())
-            data.append(x)
+            data.append(float(x))#s*factor + shift)
         return times, data
             
     def get_data(self):
-        x = float(self.device.getSensorsData(16,1))
-        if self.unit:
-            return x*self.factor
-        else:
-            return x
+        x = float(self.device.getSensorsData(8,1))
+        
 
 if __name__ == '__main__':
-    d = Neulog()
+    d = Neulog(port="COM5")
     d.scan()
-    d.get_data2()
+    #d.device.expStart(100, 2, 10, [(16,1),(8,1)], 1)
+    #while True:
+    #    print d.device.getSamples()
+    #quit()
+    t0=0
+    while True:
+        print d.get_data2()
