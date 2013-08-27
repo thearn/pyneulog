@@ -137,7 +137,6 @@ class Device(serial.Serial):
             #FIXME This sometimes returns nothing
             print 'Did not get response from eeread, will keep on trying'
             return self.eeread(stype, sid, add)
-            raise Exception('Sensor did not acknowledge');
         return [ord(c) for c in t[4:7]]
 
     def eewrite(self, stype, sid, add, val):
@@ -295,6 +294,8 @@ def scan():
 
 def detect_device():
     ports = scan()
+    print ports
+    quit()
     for port in ports:
         d = Device(port = port)
         try:
@@ -305,17 +306,35 @@ def detect_device():
             pass
 
 
-class gsr(object):
+class Neulog(object):
 
     def __init__(self, unit = False):
         self.unit = unit
-        self.factor = (2**16)/10. 
+        #GSR: microsiemens
+        #HR: 
+        #EKG:
+        self.factors = {"GSR" : (2**16)/10.,
+                        "HR" : (2**10)/210 + 30} 
         self.device = Device()
         t = time.time()
         while not self.device.connect(): 
             if time.time() - t > 2:
                 break
-
+            
+    def scan(self):
+        self.sensors = self.device.scanRead()
+        
+        #self.eewrite(stype, sid, chr(2), chr(rate / 256))
+        #self.eewrite(stype, sid, chr(3), chr(rate % 256))
+        
+    def get_data2(self):
+        times, data = [], []
+        for stype, sid, vid in self.sensors:
+            x = self.device.getSensorsData(stype,sid)
+            times.append(time.time())
+            data.append(x)
+        return times, data
+            
     def get_data(self):
         x = float(self.device.getSensorsData(16,1))
         if self.unit:
@@ -324,6 +343,6 @@ class gsr(object):
             return x
 
 if __name__ == '__main__':
-    d = gsr()
-    while True:
-        print d.get_data()
+    d = Neulog()
+    d.scan()
+    d.get_data2()
