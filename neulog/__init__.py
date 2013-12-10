@@ -1,1 +1,1 @@
-from neulog import gsr
+from neulog import gsr, Neulog

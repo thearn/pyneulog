@@ -158,7 +158,7 @@ class Device(serial.Serial):
     def getSensorsData(self, stype, sid):
         if self.status != 'connected': return False
         self.send(STX + chr(stype) + chr(sid) + IN_READ + (3 * chr(0)), True)
-        r = self.receive(sleep=0.001)
+        r = self.receive(sleep=0.01)
         if not r or STX != r[0] or IN_READ != r[3]: return False
         r = [ord(c) for c in r]
         if r[-1] != sum(r[:-1]) % 256: return False
@@ -305,8 +305,13 @@ def detect_device():
 
 
 class Neulog(object):
-
+    """
+    Generic inteface to Neulog brand sensor blocks, connected via USB
+    """
     def __init__(self, unit = False, port = ""):
+        """
+        Takes in a serial port as an optional argument
+        """
         self.unit = unit
         #GSR: microsiemens
         #HR: 
@@ -323,6 +328,12 @@ class Neulog(object):
                 break
             
     def scan(self):
+        """
+        Identify all Neulog sensor blocks connected via USB
+        NOTE: Only works on blocks that we've worked with directly
+        (GSR, ECG, Pulse, etc)
+        Must be updated to support a new device.
+        """
         print
         print "scanning for Neulog sensors..."
         print 30*"="
@@ -336,25 +347,24 @@ class Neulog(object):
             sensor = self.device.scanRead()
         self.device.scanStop()
         for sensor in sensors:
+            print sensor
             if sensor[0] in self.sensor_names:
                 print "found:", self.sensor_names[sensor[0]]
             else:
                 print "found: (unknown module)", sensor
         self.sensors = sensors
         
-    def get_data2(self, sensors = []):
+    def get_data(self, sensors = []):
+        """
+        Gathers data from each Neulog device, and returns it as a list.
+        """
         if len(sensors) == 0:
             sensors = self.sensors
-        times, data = [], []
+        data = []
         for stype, sid, vid in sensors:
             x = self.device.getSensorsData(stype,sid)
-            #factor, shift = self.factors[stype]
-            times.append(time.time())
             data.append(float(x))#s*factor + shift)
-        return times, data
-            
-    def get_data(self):
-        x = float(self.device.getSensorsData(8,1))
+        return data
         
 
 class gsr(object):
@@ -379,11 +389,21 @@ class gsr(object):
         
 if __name__ == '__main__':
     d = Neulog(port="COM5")
+    import pylab, numpy
+    data=[]
     d.scan()
-    #d.device.expStart(100, 2, 10, [(16,1),(8,1)], 1)
+    #d.device.expStart(100, 2, 10, [(16,1),(25,1)], 1)
     #while True:
     #    print d.device.getSamples()
     #quit()
-    t0=0
-    while True:
-        print d.get_data2()
+    t= time.time()
+    while time.time() - t < 10:
+        x,y = d.get_data()
+        print x,y 
+        data.append([x,y])
+    data = numpy.array(data)[1:]
+    pylab.subplot(211)
+    pylab.plot(data.T[0])
+    pylab.subplot(212)
+    pylab.plot(data.T[1])
+    pylab.show()
