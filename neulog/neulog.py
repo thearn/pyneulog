@@ -329,6 +329,7 @@ class Neulog(object):
         t = time.time()
         sensors = []
         self.device.scanStart()
+        time.sleep(1)
         sensor = self.device.scanRead()
         while len(sensor) !=0:
             sensors += sensor
@@ -341,9 +342,11 @@ class Neulog(object):
                 print "found: (unknown module)", sensor
         self.sensors = sensors
         
-    def get_data2(self):
+    def get_data2(self, sensors = []):
+        if len(sensors) == 0:
+            sensors = self.sensors
         times, data = [], []
-        for stype, sid, vid in self.sensors:
+        for stype, sid, vid in sensors:
             x = self.device.getSensorsData(stype,sid)
             #factor, shift = self.factors[stype]
             times.append(time.time())
@@ -354,6 +357,26 @@ class Neulog(object):
         x = float(self.device.getSensorsData(8,1))
         
 
+class gsr(object):
+    """
+    GSR - Specific data collection object
+    """
+    def __init__(self, unit = False):
+        self.unit = unit
+        self.factor = (2**16)/10. 
+        self.device = Device()
+        t = time.time()
+        while not self.device.connect(): 
+            if time.time() - t > 2:
+                break
+
+    def get_data(self):
+        x = float(self.device.getSensorsData(16,1))
+        if self.unit:
+            return x*self.factor
+        else:
+            return x
+        
 if __name__ == '__main__':
     d = Neulog(port="COM5")
     d.scan()
